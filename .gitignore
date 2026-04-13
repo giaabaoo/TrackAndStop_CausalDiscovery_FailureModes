@@ -1,0 +1,6 @@
+harsh.tex
+todo.md
+*.pdf
+__pycache__/
+*.pyc
+*.log

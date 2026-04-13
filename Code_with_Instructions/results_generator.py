@@ -71,6 +71,7 @@ def Run_CausalDiscovery_Algorithms_and_plot_results(Num_Grphs,nodes,degree,Max_s
         color_line = np.array([0.13,0.19,0.45]) ;
         plt_label= 'GIES'
         plt = plot_shd(np.array(Data_save),color_line,plt,Max_samples-Gap,plt_label)
+        plt.savefig(f'../baseline_n{nodes}_deg{degree}.png', dpi=150, bbox_inches='tight')
         plt.show()
 
 
