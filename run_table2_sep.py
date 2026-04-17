@@ -264,16 +264,16 @@ if __name__ == '__main__':
             'sep_mean':   np.mean(sep_shds),   'sep_std':   np.std(sep_shds),
             'rnd_mean':   np.mean(rnd_shds),   'rnd_std':   np.std(rnd_shds),
         }
-        print(f'  TsP-Color: {np.mean(color_shds):.2f} +/- {np.std(color_shds):.2f}')
+        print(f'  TsP:       {np.mean(color_shds):.2f} +/- {np.std(color_shds):.2f}')
         print(f'  TsP-Sep:   {np.mean(sep_shds):.2f} +/- {np.std(sep_shds):.2f}')
         print(f'  Random:    {np.mean(rnd_shds):.2f} +/- {np.std(rnd_shds):.2f}')
 
     # Print LaTeX
     print('\n\n% ── TABLE: Separating Sets vs Graph Coloring vs Random ──')
-    print('Latents & Random & TsP-Color & TsP-Sep \\\\')
+    print('Latents & Random & TsP & TsP-Sep \\\\')
     for num_latents in NUM_LATENTS_SWEEP:
         r = results[num_latents]
         label = str(num_latents) if num_latents > 0 else '0 (none)'
         print(f'{label} & ${r["rnd_mean"]:.2f} \\pm {r["rnd_std"]:.2f}$ '
-              f'& ${r["color_mean"]:.2f} \\pm {r["color_std"]:.2f}$ '
+              f'& ${r["color_mean"]:.2f} \\pm {r["color_std"]:.2f}$ '  # TsP
               f'& ${r["sep_mean"]:.2f} \\pm {r["sep_std"]:.2f}$ \\\\')

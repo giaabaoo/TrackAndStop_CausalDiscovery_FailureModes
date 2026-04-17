@@ -125,11 +125,11 @@ Density & Random & Track-and-Stop \\
 
 \begin{table}[h]
 \centering
-\caption{\added{[NEW]} Effect of unobserved confounding (varying number of latent nodes). \added{Fixed: $n=5$, density$=0.5$, $B=5000$, 50 trials, $\delta=0.3$, fanout$=2$. TsP-Color uses graph-coloring intervention groups; TsP-Sep uses strongly separating sets~\cite{kocaoglu2017experimental}.}}
+\caption{\added{[NEW]} Effect of unobserved confounding (varying number of latent nodes). \added{Fixed: $n=5$, density$=0.5$, $B=5000$, 50 trials, $\delta=0.3$, fanout$=2$. TsP uses graph-coloring intervention groups; TsP-Sep uses strongly separating sets~\cite{kocaoglu2017experimental}.}}
 \label{tab:confounding}
 \begin{tabular}{c|ccc}
 \toprule
-\# Latents & Random & TsP-Color & TsP-Sep \\
+\# Latents & Random & TsP & TsP-Sep \\
 \midrule
 0 (none) & $1.96 \pm 1.85$ & $0.54 \pm 1.02$ & $0.58 \pm 1.08$ \\
 1 & $2.16 \pm 1.69$ & $3.72 \pm 2.11$ & $3.22 \pm 2.33$ \\
@@ -183,7 +183,7 @@ Track-and-Stop consistently outperforms Random as $\delta$ increases (SHD: $1.92
 Track-and-Stop degrades with density (SHD: $0.00 \to 1.54$) while Random remains stable ($2.04$--$3.20$), with the gap nearly closing at density $0.9$. This suggests dense graphs are a structural failure mode for adaptive allocation: larger equivalence classes make competing hypotheses harder to distinguish within a fixed budget, even under ideal conditions.}
 
 \added{\paragraph{Effect of unobserved confounding (Table~\ref{tab:confounding}).}
-Confounding is the most severe failure mode. With even 1 latent node, TsP-Color degrades from SHD $0.54$ to $3.72$ ($7\times$ worse), while Random is nearly unaffected ($1.96 \to 2.16$). Replacing graph-coloring intervention groups with strongly separating sets~\cite{kocaoglu2017experimental} (TsP-Sep) yields a modest but consistent improvement across all confounded settings (e.g., SHD $3.22$ vs.\ $3.72$ at 1 latent), yet both TsP variants remain substantially worse than Random for all $\geq 1$ latents. At 4 latents the advantage of TsP-Sep reverses slightly ($5.00$ vs.\ $4.96$), suggesting separating sets alone do not resolve the fundamental failure: spurious correlations from hidden nodes mislead the KL-based allocation regardless of intervention group design.}
+Confounding is the most severe failure mode. With even 1 latent node, TsP degrades from SHD $0.54$ to $3.72$ ($7\times$ worse), while Random is nearly unaffected ($1.96 \to 2.16$). Replacing graph-coloring intervention groups with strongly separating sets~\cite{kocaoglu2017experimental} (TsP-Sep) yields a modest but consistent improvement across all confounded settings (e.g., SHD $3.22$ vs.\ $3.72$ at 1 latent), yet both TsP variants remain substantially worse than Random for all $\geq 1$ latents. At 4 latents the advantage of TsP-Sep reverses slightly ($5.00$ vs.\ $4.96$), suggesting separating sets alone do not resolve the fundamental failure: spurious correlations from hidden nodes mislead the KL-based allocation regardless of intervention group design.}
 
 \added{\paragraph{Effect of imperfect interventions (Table~\ref{tab:noisy_interventions}).}
 As the intervention failure probability $\epsilon$ increases from 0.0 to 0.2, both methods degrade, but Track-and-Stop remains more robust: its SHD rises from $0.38$ to $0.80$, while Random's rises from $1.08$ to $2.68$. Notably, Track-and-Stop consistently outperforms Random even under significant noise, suggesting that adaptive allocation retains its advantage as long as interventions retain some signal.}
