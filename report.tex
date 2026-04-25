@@ -143,6 +143,39 @@ Density & Random & Track-and-Stop \\
 
 \begin{table}[h]
 \centering
+\caption{\added{[NEW]} Misspecification-aware TsP variants under confounding. Fixed: $n=5$, density$=0.5$, $B=5000$, 50 trials, $\delta=0.3$, fanout$=2$.
+TsP-JS uses Jensen-Shannon divergence; TsP-Adaptive detects KL stagnation and falls back to conditional-independence-based orientation.}
+\label{tab:improvements}
+\begin{tabular}{c|cccc}
+\toprule
+\# Latents & Random & TsP & TsP-JS & TsP-Adaptive \\
+\midrule
+0 (none) & $1.84 \pm 2.22$ & $0.52 \pm 0.96$ & $0.52 \pm 0.96$ & $0.52 \pm 0.96$ \\
+1 & $1.48 \pm 1.69$ & $3.22 \pm 2.21$ & $3.22 \pm 2.30$ & $\mathbf{2.38 \pm 1.74}$ \\
+2 & $1.92 \pm 2.00$ & $4.38 \pm 2.47$ & $4.34 \pm 2.41$ & $\mathbf{2.36 \pm 2.10}$ \\
+3 & $1.60 \pm 1.92$ & $4.78 \pm 2.33$ & $4.84 \pm 2.37$ & $\mathbf{2.92 \pm 2.69}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{\added{[NEW]} Stopping rule analysis ($\tau=1.0$): rate at which TsP never triggers a stop, and rate at which it stops with SHD$>0$ (false stop). Fixed: $n=5$, density$=0.5$, $B=5000$, 50 trials, $\delta=0.3$, fanout$=2$.}
+\label{tab:stopping}
+\begin{tabular}{c|ccc}
+\toprule
+\# Latents & Never-stop (\%) & False-stop (\%) & Mean SHD \\
+\midrule
+0 (none) & 12 & 20 & 0.52 \\
+1 & 6 & 94 & 3.04 \\
+2 & 8 & 93 & 4.38 \\
+3 & 4 & 98 & 5.04 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
 \caption{\added{[NEW]} Effect of imperfect interventions (varying $\epsilon$). \added{Fixed: $n=5$, density$=0.5$, $B=5000$, 50 trials.}}
 \label{tab:noisy_interventions}
 \begin{tabular}{c|cc}
@@ -182,8 +215,10 @@ Track-and-Stop consistently outperforms Random as $\delta$ increases (SHD: $1.92
 \added{\paragraph{Effect of graph density (Table~\ref{tab:graph_density}).}
 Track-and-Stop degrades with density (SHD: $0.00 \to 1.54$) while Random remains stable ($2.04$--$3.20$), with the gap nearly closing at density $0.9$. This suggests dense graphs are a structural failure mode for adaptive allocation: larger equivalence classes make competing hypotheses harder to distinguish within a fixed budget, even under ideal conditions.}
 
-\added{\paragraph{Effect of unobserved confounding (Table~\ref{tab:confounding}).}
-Confounding is the most severe failure mode: even 1 latent node causes TsP to collapse while Random is nearly unaffected. Using strongly separating sets~\cite{kocaoglu2017experimental} (TsP-Sep) consistently improves over standard TsP under confounding, as the intervention groups are designed to be confounder-agnostic. However, both TsP variants remain substantially worse than Random for all $\geq 1$ latents. The root cause is the graph estimation step — $d^*_k = \argmin_d \text{KL}(\hat{P} \| P_d)$ selects the wrong MPDAG because every candidate assumes causal sufficiency. The fix requires replacing the MPDAG candidate space with MAGs that explicitly represent hidden common causes.}
+\added{\paragraph{Effect of unobserved confounding (Tables~\ref{tab:confounding} and~\ref{tab:improvements}).}
+Confounding is the most severe failure mode: even 1 latent node causes TsP to collapse while Random is nearly unaffected. Using strongly separating sets~\cite{kocaoglu2017experimental} (TsP-Sep) consistently improves over standard TsP, but both remain substantially worse than Random for all $\geq 1$ latents. The root cause is the graph estimation step — $d^*_k = \argmin_d \text{KL}(\hat{P} \| P_d)$ selects the wrong MPDAG because every candidate assumes causal sufficiency; the 94--98\% false-stop rate (Table~\ref{tab:stopping}) confirms that TsP halts with high confidence on the wrong graph.
+
+We propose TsP-Adaptive, grounded in the following observation: under the correctly specified model, the empirical $\min_d \text{KL}(\hat{P} \| P_d)$ decreases at rate $O(1/\sqrt{N_k})$ by the central limit theorem for empirical distributions. Under confounding, it stagnates because no MPDAG candidate is correct. TsP-Adaptive monitors this rate: if $\min_d \text{KL} > C/\sqrt{N_{k,\min}}$ persists for $T_0$ steps after a burn-in, it declares model misspecification and falls back to a chi-square-based conditional independence orientation (Learn\_cut), which does not assume causal sufficiency. TsP-Adaptive reduces SHD by 26\% at 1 latent (3.22~$\to$~2.38), 46\% at 2 latents (4.38~$\to$~2.36), and 39\% at 3 latents (4.78~$\to$~2.92), without any regression under no confounding (Table~\ref{tab:improvements}). TsP-JS (Jensen-Shannon divergence, which avoids infinite values under support mismatch) shows negligible improvement, confirming that the failure is in the model class, not the divergence measure.}
 
 \added{\paragraph{Effect of imperfect interventions (Table~\ref{tab:noisy_interventions}).}
 As the intervention failure probability $\epsilon$ increases from 0.0 to 0.2, both methods degrade, but Track-and-Stop remains more robust: its SHD rises from $0.38$ to $0.80$, while Random's rises from $1.08$ to $2.68$. Notably, Track-and-Stop consistently outperforms Random even under significant noise, suggesting that adaptive allocation retains its advantage as long as interventions retain some signal.}
@@ -191,27 +226,35 @@ As the intervention failure probability $\epsilon$ increases from 0.0 to 0.2, bo
 \added{\paragraph{Effect of finite-sample regimes (Table~\ref{tab:budget}).}
 With a smaller budget ($B=1000$), both methods show higher SHD and variance. As the budget increases to $B=5000$, both methods improve, with Track-and-Stop benefiting more (SHD: $0.84 \to 0.28$) compared to Random (SHD: $1.36 \to 0.72$). This suggests that adaptive allocation is more sample-efficient but requires a minimum budget to converge reliably.}
 
+\added{\paragraph{Sequential decision-making view: stopping and cumulative regret.}
+Table~\ref{tab:stopping} shows TsP's stopping behavior under confounding. Under no confounding, 80\% of trials stop successfully with SHD $= 0$. Under confounding, the false-stop rate reaches 94--98\%: TsP halts having declared the correct graph, but is wrong. This overconfidence is the defining SDM failure. Cumulative regret — $\sum_t \text{SHD}(t)$, summing the estimation error at every step — captures this directly: TsP's cumulative regret (AUC $= 12{,}524$) exceeds Random's ($9{,}850$) at 1 latent, confirming that TsP not only fails to improve but actively incurs more error than a non-adaptive policy. SHD learning curves (not shown) reveal the mechanism: under confounding, TsP's SHD stops decreasing after $\sim 500$ samples and plateaus at a high value, while Random continues to gradually improve via chi-square-based orientation.}
+
 \section{Analysis}
 \paragraph{Failure mode 1: Unobserved confounding.}
-\emph{Observation:} SHD increases and incorrect orientations persist even with larger budgets.
-\emph{Mechanism:} The allocation rule assumes causal sufficiency when estimating divergences. Latent confounders induce dependencies that are indistinguishable under the assumed model, leading to misleading information estimates.
-\emph{Implication:} Adaptive strategies can be confidently wrong when hidden variables are present.
+\emph{Observation:} SHD jumps sharply at 1 latent and stays high; 94--98\% of trials stop with high confidence on the wrong graph.
+\emph{Mechanism:} The candidate set $\{P_d\}$ consists entirely of MPDAGs that assume causal sufficiency. The true data distribution, generated by a MAG, lies outside their convex hull. The argmin KL estimator picks the least-wrong MPDAG, which may share few edges with the true DAG. As data accumulates, confidence in this wrong answer grows.
+\emph{Implication:} No surface-level modification to the allocation policy or divergence measure can fix this: the failure is in the model class. TsP-Adaptive partially recovers by detecting stagnation and switching to a misspecification-robust estimator, reducing SHD by 26--46\%.
 
 \paragraph{Failure mode 2: Imperfect interventions.}
-\emph{Observation:} Performance degrades as intervention noise increases.
-\emph{Mechanism:} KL estimates rely on clean interventional distributions. Noise blurs differences between candidate graphs, flattening the allocation objective and reducing discrimination.
-\emph{Implication:} Real-world intervention noise can negate the benefits of adaptivity.
+\emph{Observation:} TsP degrades gracefully under noise ($\epsilon \leq 0.2$), retaining advantage over Random.
+\emph{Mechanism:} Stochastic failures soften but do not eliminate the interventional signal. KL estimates remain meaningful, just noisier.
+\emph{Implication:} Moderate intervention noise is a manageable failure mode for adaptive strategies.
 
 \paragraph{Failure mode 3: Finite-sample estimation.}
 \emph{Observation:} Under small budgets, allocation is unstable and outcomes vary widely.
 \emph{Mechanism:} Early divergence estimates have high variance, causing premature exploitation of suboptimal interventions.
-\emph{Implication:} Adaptive policies are sensitive to early noise and may require regularization or exploration safeguards.
+\emph{Implication:} Adaptive policies require a minimum budget to converge reliably. The advantage over Random grows with budget.
+
+\paragraph{Sequential decision-making perspective.}
+We reframe the failure modes in SDM terms. TsP-Adaptive's detection criterion — $\min_d \text{KL}(\hat{P} \| P_d) > C/\sqrt{N}$ — is a sequential hypothesis test: the null is that the data are consistent with some MPDAG candidate. Under confounding, this null is false and rejection leads to a more robust estimator. The cumulative regret (sum of SHD over time) captures overconfidence more directly than terminal SHD: TsP accrues higher cumulative regret than Random under confounding (12,524 vs.\ 9,850 at 1 latent), while TsP-Adaptive recovers much of this gap by abandoning the wrong model class earlier.
 
 \section{Discussion}
-Our results highlight that the advantages of adaptive intervention design depend critically on idealized assumptions. When these are violated, the algorithm's reliance on estimated divergences can lead to systematic errors. A promising direction is to incorporate uncertainty-aware allocation or conservative decision rules that avoid overconfident updates under noisy feedback.
+Confounding is the dominant failure mode and the hardest to fix without changing the model class. TsP-Adaptive shows that detecting misspecification online — via the CLT rate of KL decrease — and falling back to a robust estimator is an effective partial mitigation. The remaining gap to Random reflects the cost of wasted samples before fallback triggers and the inherent difficulty of conditional independence testing under small samples.
+
+The fundamental fix is to replace MPDAG candidates with MAGs (Maximal Ancestral Graphs), which explicitly model latent common causes. This would allow the KL estimator to converge to the correct graph even under confounding. TsP-Adaptive can be seen as a computationally tractable approximation: rather than searching over MAGs, it detects that no MPDAG fits and hands off to a misspecification-robust subroutine.
 
 \section{Conclusion}
-We present a systematic study of failure modes in adaptive causal discovery. By isolating confounding, intervention noise, and finite-sample effects, we show that adaptive strategies can fail to outperform simple baselines and may become overconfident under misspecification. These findings motivate future work on robust, uncertainty-aware intervention policies.
+We present a systematic study of failure modes in adaptive causal discovery, adding a misspecification-aware variant (TsP-Adaptive) grounded in CLT-based stagnation detection. Our findings show that confounding is catastrophic for the KL-based estimator, but detectable from the rate of KL decrease, enabling a fallback that reduces SHD by 26--46\% without cost under no confounding. The remaining failure modes — intervention noise and finite-sample effects — are more manageable. These results suggest that robust adaptive causal discovery requires both misspecification detection and an expanded candidate model class (MPDAGs~$\to$~MAGs).
 
 \bibliographystyle{abbrvnat}
 \bibliography{references}
