@@ -55,6 +55,47 @@ def add_latent_confounders(bn_obs, num_latents=1, fanout=2, delta=0.2, seed=None
     return bn_env, observed_names
 
 
+def select_ucb_arm(Nt, reward_sum, t):
+    """
+    UCB1 selection over intervention-set arms.
+    Nt[i] = how many times arm i was played
+    reward_sum[i] = cumulative reward for arm i
+    """
+    n_arms = len(Nt)
+
+    for i in range(n_arms):
+        if Nt[i] == 0:
+            return i
+
+    ucb_values = np.zeros(n_arms, dtype=float)
+    for i in range(n_arms):
+        mean_reward = reward_sum[i] / Nt[i]
+        bonus = np.sqrt(2.0 * np.log(max(t, 2)) / Nt[i])
+        ucb_values[i] = mean_reward + bonus
+
+    return int(np.argmax(ucb_values))
+
+def current_best_edge_set(MPDAG_LIST, PD, Ps):
+    import math
+    from scipy.special import rel_entr
+
+    Dstar_E = set()
+    for i_idx in range(len(MPDAG_LIST)):
+        if len(MPDAG_LIST[i_idx]) == 0:
+            continue
+
+        KL_vector = np.zeros(len(MPDAG_LIST[i_idx]))
+        for dindex in range(len(MPDAG_LIST[i_idx])):
+            KL_vector[dindex] = sum(rel_entr(Ps[i_idx], PD[i_idx][dindex])) / math.log(2)
+            if math.isinf(KL_vector[dindex]) or np.isnan(KL_vector[dindex]):
+                KL_vector[dindex] = 1e5
+
+        best = np.argmin(KL_vector)
+        Dstar_E |= MPDAG_LIST[i_idx][best].arcs()
+
+    return Dstar_E
+
+
 import math
 
 def generate_strongly_separating_sets(n_nodes: int):
@@ -878,6 +919,8 @@ def Track_and_stop(Num_Grphs,nodes,degree,Max_samples):
             
                 Zt =0
                 Nt = np.zeros(sz_i,dtype= int)
+                reward_sum = np.zeros(sz_i, dtype=float)
+                last_shd = None
                 sZt_vec = np.zeros(sz_d,dtype= float)
                 aub = np.zeros((sz_d,sz_i+1),dtype= float)
                 aub[:,0] = -1*np.ones(sz_d)
@@ -898,6 +941,8 @@ def Track_and_stop(Num_Grphs,nodes,degree,Max_samples):
                        Sample_and_update_dist(data[I.index(i)],I.index(i),Cnts,Nt[I.index(i)])
                        Nt[I.index(i)]+=1
                        Ps[I.index(i)] = (np.array(Cnts[I.index(i)])/Nt[I.index(i)]).tolist() 
+                       Dstar_E = current_best_edge_set(MPDAG_LIST, PD, Ps)
+                       last_shd = len(Truedag - Dstar_E) + len(Dstar_E - Truedag)
                 samples = 0
                 while (True):
                   if ( samples > Max_samples):
@@ -931,17 +976,24 @@ def Track_and_stop(Num_Grphs,nodes,degree,Max_samples):
                   
                               
                                    
-                  alpha_star = alpha_star/(sum(alpha_star)) 
+                #   alpha_star = alpha_star/(sum(alpha_star)) 
                   if (min(Nt) < 25*math.sqrt(t)):                                                         
                                                   act = np.argmin(Nt)                           
                   else:
-                                                  act = np.argmax(t*alpha_star - Nt) 
-                  
-            
+                                                #   act = np.argmax(t*alpha_star - Nt) 
+                                                  act = select_ucb_arm(Nt, reward_sum, t)
+
                   Sample_and_update_dist(data[act],act,Cnts,Nt[act])
                   Nt[act]+=1
-                  Ps[act] = (np.array(Cnts[act])/Nt[act]).tolist()      
-                  shd[samples:samples+len(I[act])] = len(Truedag - Dstar_E) +len(Dstar_E-Truedag)
+                  Ps[act] = (np.array(Cnts[act])/Nt[act]).tolist()  
+                  Dstar_E = current_best_edge_set(MPDAG_LIST, PD, Ps)
+                  current_shd = len(Truedag - Dstar_E) + len(Dstar_E - Truedag)
+                  shd[samples:samples+len(I[act])] = current_shd
+
+                  reward = np.max(KL_vector) - np.min(KL_vector)
+                  reward = np.clip(reward, 0, 10)
+                  reward_sum[act] += reward
+                  #last_shd = current_shd
                   #print(len(Truedag - Dstar_E) +len(Dstar_E-Truedag))  
                   t = t + 1
                   #print(Zt,' ',math.log(t/delta),'  ',t,'  ',shd[t-2])
