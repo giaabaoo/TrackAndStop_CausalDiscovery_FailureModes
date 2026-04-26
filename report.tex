@@ -286,4 +286,125 @@ We present a systematic study of failure modes in adaptive causal discovery, add
 \label{fig:fig3}
 \end{figure}
 
-\end{document}
+% ════════════════════════════════════════════════════════════════
+\section{Robustness Investigation: Methods Tried Under Confounding}
+\label{app:methods}
+% ════════════════════════════════════════════════════════════════
+
+\textcolor{blue}{This appendix documents all methods tested to improve TsP under unobserved confounding, in chronological order. Each entry states the motivation, what was changed, and what was found. The uniform conclusion is that the failure is in the \emph{model class} (MPDAG candidates assume causal sufficiency), not in the allocation policy or divergence formula.}
+
+\medskip
+\noindent\textcolor{blue}{\textbf{Setup for all experiments.} $n=5$, density $= 0.5$, $B=5000$, 50 trials, $\delta=0.3$, fanout $=2$. Baseline: TsP (SHD at 1/2/3 latents: $3.72/4.52/4.90$) vs.\ Random (${\approx}2.0$ throughout).}
+
+\bigskip
+
+% ────────────────────────────────────────────────────────────────
+\noindent\textcolor{blue}{\textbf{M1. TsP-Sep — Strongly Separating Sets (NeurIPS 2017)}}
+
+\noindent\textcolor{blue}{\emph{Motivation.} Graph-coloring groups are optimized for the observed DAG. Strongly separating sets $\{S_j\}$ (where $|S_j| = \lceil \log_2 n \rceil$) are designed to separate every pair of nodes regardless of graph structure, potentially more robust to latent paths.}
+
+\noindent\textcolor{blue}{\emph{Change.} Replace graph-coloring intervention groups with bit-mask separating sets. All else identical.}
+
+\noindent\textcolor{blue}{\emph{Result.}
+\begin{center}
+\begin{tabular}{c|ccc}
+\toprule
+Latents & Random & TsP & TsP-Sep \\
+\midrule
+0 & $1.96\pm1.85$ & $0.54\pm1.02$ & $0.58\pm1.08$ \\
+1 & $2.16\pm1.69$ & $3.72\pm2.11$ & $3.22\pm2.33$ \\
+3 & $1.68\pm1.67$ & $4.90\pm2.34$ & $4.58\pm2.40$ \\
+\bottomrule
+\end{tabular}
+\end{center}}
+
+\noindent\textcolor{blue}{\emph{Lesson.} Modest consistent improvement (${\sim}10\%$) but both TsP variants remain far worse than Random. Intervention grouping is not the bottleneck.}
+
+\bigskip
+
+% ────────────────────────────────────────────────────────────────
+\noindent\textcolor{blue}{\textbf{M2 \& M3. Allocation Policy Fixes (Quadratic Penalty + Stagnation Fallback)}}
+
+\noindent\textcolor{blue}{\emph{Motivation.} Maybe the allocation weights $\alpha_k = 1/\min\text{KL}_k$ over-concentrate on one group under confounding. Fix: M2 uses $\alpha_k = 1/\min\text{KL}_k^2$ (quadratic, more aggressive rebalancing); M3 detects stagnation via a sliding window and switches to uniform random allocation.}
+
+\noindent\textcolor{blue}{\emph{Change.} M2: replace $\alpha_k$ formula. M3: add stagnation counter; if $\Delta\text{KL}/\text{KL} < \epsilon$ for 50 steps, allocate uniformly.}
+
+\noindent\textcolor{blue}{\emph{Result.} Both produce \textbf{identical SHD} to baseline TsP at all latent counts.}
+
+\noindent\textcolor{blue}{\emph{Lesson.} Allocation policy is irrelevant when $d^*$ is wrong. Even if samples are distributed differently, the argmin KL still selects the same wrong MPDAG candidate.}
+
+\bigskip
+
+% ────────────────────────────────────────────────────────────────
+\noindent\textcolor{blue}{\textbf{M4. UCB Exploration Bonus}}
+
+\noindent\textcolor{blue}{\emph{Motivation.} Standard TsP allocation is deterministic once KL estimates stabilize. Add UCB bonus $\beta\sqrt{\log t / N_k}$ to force continued exploration of undersampled groups, preventing lock-in to a wrong hypothesis.}
+
+\noindent\textcolor{blue}{\emph{Change.} $\text{act} = \arg\max_k\,(t\,\alpha_k - N_k + \beta\sqrt{\log t / N_k})$. Tested $\beta \in \{0.5, 1.0, 2.0\}$.}
+
+\noindent\textcolor{blue}{\emph{Result.} \textbf{Identical SHD} to TsP baseline at all $\beta$ and all latent counts.}
+
+\noindent\textcolor{blue}{\emph{Lesson.} Same conclusion as M2/M3: the UCB bonus changes which group is sampled next, but the estimator $d^*$ is still evaluated on a misspecified model class.}
+
+\bigskip
+
+% ────────────────────────────────────────────────────────────────
+\noindent\textcolor{blue}{\textbf{M5. TsP-JS — Jensen-Shannon Divergence}}
+
+\noindent\textcolor{blue}{\emph{Motivation.} KL$(P_\text{emp} \| P_d)$ is infinite when $P_d(x)=0$ but $P_\text{emp}(x)>0$, which happens under confounding (empirical distribution has mass outside every MPDAG candidate's support). This is capped at $10^5$, distorting $d^*$ selection. JS divergence uses mixture $M = (P+Q)/2$ as reference, so is always finite and bounded in $[0,1]$.}
+
+\noindent\textcolor{blue}{\emph{Change.} Replace $\text{KL}(P_\text{emp} \| P_d)$ with $\text{JS}(P_\text{emp}, P_d) = \tfrac{1}{2}\text{KL}(P\|M) + \tfrac{1}{2}\text{KL}(Q\|M)$.}
+
+\noindent\textcolor{blue}{\emph{Result.} SHD improvement $\leq 0.04$ at all latent counts — negligible.}
+
+\noindent\textcolor{blue}{\emph{Lesson.} The support-mismatch is a symptom, not the cause. JS still picks the least-wrong MPDAG; it's just a smoother measure of wrongness. The wrong answer is the wrong answer regardless of how smoothly it's measured.}
+
+\bigskip
+
+% ────────────────────────────────────────────────────────────────
+\noindent\textcolor{blue}{\textbf{M6. TsP-MinMax — Best-Case KL over Intervention Configs}}
+
+\noindent\textcolor{blue}{\emph{Motivation.} TsP fixes the intervention configuration as the ``golden config'' computed from the clean (unconfounded) $P_v$. Under confounding this config may no longer best separate candidates. Give each MPDAG candidate $d$ the benefit of the doubt: pick the config $v$ that minimises $\text{KL}(P_\text{emp} \| P_d^v)$, then take $d^* = \arg\min_d$.}
+
+\noindent\textcolor{blue}{\emph{Change.} $d^* = \arg\min_d \min_v \text{KL}(P_\text{emp} \| P_d^v)$.}
+
+\noindent\textcolor{blue}{\emph{Result.} Slightly \emph{worse} than baseline (SHD $+0.02$--$+0.38$).}
+
+\noindent\textcolor{blue}{\emph{Lesson.} Giving wrong candidates their best config allows them to match the empirical distribution better by chance, making $d^*$ selection noisier.}
+
+\bigskip
+
+% ────────────────────────────────────────────────────────────────
+\noindent\textcolor{blue}{\textbf{M7. TsP-Adaptive — CLT-Based Misspecification Detection \checkmark}}
+
+\noindent\textcolor{blue}{\emph{Motivation.} Under the correctly specified model, $\min_d \text{KL}(\hat{P}\|P_d)$ decreases at rate $O(1/\sqrt{N_k})$ by the CLT for empirical distributions. Under confounding, it stagnates because no MPDAG is correct. This rate-of-decrease is a sequential hypothesis test: reject ``data consistent with some MPDAG'' when the rate violation persists.}
+
+\noindent\textcolor{blue}{\emph{Change.} After a burn-in of 200 steps, monitor whether $\min_d \text{KL} > C/\sqrt{N_{k,\min}}$ for $T_0 = 100$ consecutive steps. If so, declare misspecification and fall back to chi-square conditional independence orientation (Learn\_cut), which does not assume causal sufficiency.}
+
+\noindent\textcolor{blue}{\emph{Result.}
+\begin{center}
+\begin{tabular}{c|cccc}
+\toprule
+Latents & Random & TsP & TsP-Adaptive & $\Delta$ \\
+\midrule
+0 & $1.84\pm2.22$ & $0.52\pm0.96$ & $0.52\pm0.96$ & $0\%$ \\
+1 & $1.48\pm1.69$ & $3.22\pm2.21$ & $\mathbf{2.38\pm1.74}$ & $-26\%$ \\
+2 & $1.92\pm2.00$ & $4.38\pm2.47$ & $\mathbf{2.36\pm2.10}$ & $-46\%$ \\
+3 & $1.60\pm1.92$ & $4.78\pm2.33$ & $\mathbf{2.92\pm2.69}$ & $-39\%$ \\
+\bottomrule
+\end{tabular}
+\end{center}}
+
+\noindent\textcolor{blue}{\emph{Lesson.} The only method that works. It succeeds not by fixing the broken estimator but by \emph{abandoning} it when misspecification is detected. The remaining gap to Random reflects (a) wasted samples before fallback triggers and (b) the intrinsic difficulty of chi-square orientation under small samples. The fundamental fix remains replacing MPDAG candidates with MAGs.}
+
+\bigskip
+
+% ────────────────────────────────────────────────────────────────
+\noindent\textcolor{blue}{\textbf{Diagnostic Experiments (not methods, but informing the analysis)}}
+
+\noindent\textcolor{blue}{\begin{itemize}
+\item \textbf{Learning curves (SDM1):} SHD vs.\ samples confirms TsP plateaus within 500 samples under confounding and never recovers, while Random slowly improves.
+\item \textbf{Stopping analysis (SDM3):} 94--98\% false-stop rate under $\geq 1$ latent — TsP halts with high confidence on the wrong graph (Table~\ref{tab:stopping}).
+\item \textbf{Cumulative regret (SDM4):} TsP's AUC (12,524) exceeds Random's (9,850) at 1 latent — TsP incurs \emph{more} total error than the non-adaptive baseline.
+\item \textbf{KL diagnostics:} Runtime min\_KL values are 0.2--0.5 (mean), confirming that standard thresholds $\geq 2.0$ never trigger and that stagnation is genuine, not a threshold artifact.
+\end{itemize}}
